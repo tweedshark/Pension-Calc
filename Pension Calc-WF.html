@@ -132,6 +132,13 @@
                     </div>
                 </div>
 
+                <h2 class="text-xl font-semibold text-gray-600 mb-4 mt-8 border-t pt-4">Other Investment Income</h2>
+                <p class="text-sm text-gray-500 mb-4">Enter your estimated annual income from other investments (e.g., rental income, dividends). This will be added to your total estimated retirement income.</p>
+                <div class="mb-6">
+                    <label for="otherInvestmentIncome" class="block text-sm input-label mb-1">Estimated Annual Other Investment Income</label>
+                    <input type="number" id="otherInvestmentIncome" class="w-full input-field" placeholder="e.g., 10000" step="100">
+                </div>
+
                 <button type="button" id="calculateButton" class="w-full calculate-button">
                     Calculate Estimated Pension
                 </button>
@@ -162,6 +169,13 @@
                 <div class="space-y-2 text-sm">
                     <p class="result-item">Canada Pension Plan (CPP): <strong id="estimatedCPP"></strong> <span id="cppNote" class="text-xs text-gray-500"></span></p>
                     <p class="result-item">Old Age Security (OAS): <strong id="estimatedOAS"></strong> <span id="oasNote" class="text-xs text-gray-500"></span></p>
+                </div>
+            </div>
+
+            <div class="mb-6 p-4 results-card rounded-lg">
+                <h3 class="text-lg results-title mb-3">Other Investment Income (Monthly)</h3>
+                <div class="space-y-2 text-sm">
+                    <p class="result-item">Estimated Monthly Other Investment Income: <strong id="monthlyOtherInvestmentIncomeDisplay"></strong></p>
                 </div>
             </div>
 
@@ -208,6 +222,7 @@
         const avgEarningsEl = document.getElementById('avgEarnings');
         const userCPPEl = document.getElementById('userCPP');
         const userOASEl = document.getElementById('userOAS');
+        const otherInvestmentIncomeEl = document.getElementById('otherInvestmentIncome');
         const calculateButton = document.getElementById('calculateButton');
         const resultsSection = document.getElementById('resultsSection');
         const messageBox = document.getElementById('messageBox');
@@ -227,6 +242,7 @@
         const cppNoteEl = document.getElementById('cppNote');
         const estimatedOASEl = document.getElementById('estimatedOAS');
         const oasNoteEl = document.getElementById('oasNote');
+        const monthlyOtherInvestmentIncomeDisplayEl = document.getElementById('monthlyOtherInvestmentIncomeDisplay');
         const totalMonthlyIncomeEl = document.getElementById('totalMonthlyIncome');
 
         let pensionProjectionChart = null; 
@@ -266,6 +282,7 @@
             const avgEarnings = parseFloat(avgEarningsEl.value);
             const userCPP = parseFloat(userCPPEl.value) || null;
             const userOAS = parseFloat(userOASEl.value) || null;
+            let otherInvestmentIncome = parseFloat(otherInvestmentIncomeEl.value);
 
             if (isNaN(creditedService) || creditedService < 0) {
                 showMessage('Please enter a valid number for Credited Service.'); return;
@@ -281,6 +298,11 @@
             }
             if (userOAS !== null && (isNaN(userOAS) || userOAS < 0)) {
                 showMessage('Please enter a valid number for Estimated Monthly OAS or leave it blank.'); return;
+            }
+            if (!otherInvestmentIncomeEl.value) { // If field is empty
+                otherInvestmentIncome = 0;
+            } else if (isNaN(otherInvestmentIncome) || otherInvestmentIncome < 0) {
+                showMessage('Please enter a valid non-negative number for Other Investment Income or leave it blank.'); return;
             }
 
             const rawAnnualLifetimePension = 0.02 * creditedService * avgEarnings;
@@ -337,8 +359,9 @@
                 estimatedMonthlyOASAtRetirement = userOAS !== null ? userOAS : DEFAULT_MONTHLY_OAS_MAX;
                  oasNoteText = `(Eligible at retirement. Default is max for age 65-74.)`;
             }
-            
-            const totalMonthlyIncome = totalMonthlyOmersPensionAtRetirement + estimatedMonthlyCPPAtRetirement + estimatedMonthlyOASAtRetirement;
+
+            const monthlyOtherInvestmentIncome = otherInvestmentIncome / 12;
+            const totalMonthlyIncome = totalMonthlyOmersPensionAtRetirement + estimatedMonthlyCPPAtRetirement + estimatedMonthlyOASAtRetirement + monthlyOtherInvestmentIncome;
 
             resultRetirementAgeEl.textContent = retirementAge;
             annualLifetimePensionEl.textContent = formatCurrency(annualLifetimePension);
@@ -366,6 +389,7 @@
             cppNoteEl.textContent = cppNoteText;
             estimatedOASEl.textContent = formatCurrency(estimatedMonthlyOASAtRetirement);
             oasNoteEl.textContent = oasNoteText;
+            monthlyOtherInvestmentIncomeDisplayEl.textContent = formatCurrency(monthlyOtherInvestmentIncome);
             totalMonthlyIncomeEl.textContent = formatCurrency(totalMonthlyIncome);
 
             resultsSection.classList.remove('hidden');
@@ -373,7 +397,7 @@
             const annualCPPForChart = (userCPP !== null ? userCPP : DEFAULT_MONTHLY_CPP) * 12;
             const annualOASForChart = (userOAS !== null ? userOAS : DEFAULT_MONTHLY_OAS_MAX) * 12;
 
-            updatePensionProjectionChart(retirementAge, annualLifetimePension, annualBridgeBenefit, annualCPPForChart, annualOASForChart);
+            updatePensionProjectionChart(retirementAge, annualLifetimePension, annualBridgeBenefit, annualCPPForChart, annualOASForChart, otherInvestmentIncome);
             chartContainerCardEl.classList.remove('hidden');
 
             if (window.innerWidth < 768) {
@@ -381,11 +405,12 @@
             }
         }
         
-        function updatePensionProjectionChart(initialRetirementAge, reducedAnnualLifetime, reducedAnnualBridge, annualCPPValue, annualOASValue) {
+        function updatePensionProjectionChart(initialRetirementAge, reducedAnnualLifetime, reducedAnnualBridge, annualCPPValue, annualOASValue, annualOtherInvestmentIncome) {
             const chartLabels = [];
             const omersData = [];
             const cppData = [];
             const oasData = [];
+            const otherInvestmentData = [];
 
             for (let i = 0; i < 10; i++) {
                 const currentAgeInProjection = initialRetirementAge + i;
@@ -408,6 +433,7 @@
                     oasForYear = annualOASValue;
                 }
                 oasData.push(oasForYear);
+                otherInvestmentData.push(annualOtherInvestmentIncome);
             }
 
             const ctx = document.getElementById('pensionProjectionChart').getContext('2d');
@@ -440,6 +466,14 @@
                             data: oasData,
                             backgroundColor: 'rgba(249, 115, 22, 0.7)', 
                             borderColor: 'rgba(249, 115, 22, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        },
+                        {
+                            label: 'Other Investment Income (Annual)',
+                            data: otherInvestmentData,
+                            backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                            borderColor: 'rgba(168, 85, 247, 1)',
                             borderWidth: 1,
                             borderRadius: 4,
                         }
