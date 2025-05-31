@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retirement Pension Estimator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .calculator-card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
+        .input-label {
+            font-weight: 500;
+            color: #374151;
+        }
+        .input-field {
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            padding: 0.75rem 1rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .input-field:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+            outline: none;
+        }
+        .calculate-button {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            transition: background-color 0.3s;
+            border: none;
+        }
+        .calculate-button:hover {
+            background-color: #2563eb;
+        }
+        .results-card {
+            background-color: #eef2ff;
+            border-left: 4px solid #4f46e5;
+        }
+        .results-title {
+            color: #3730a3;
+            font-weight: 600;
+        }
+        .result-item strong {
+            color: #1e3a8a;
+        }
+        .message-box {
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+        .message-box-error {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+        .message-box-info { /* For general info like reduction notice */
+            background-color: #ffedd5; /* Light orange */
+            color: #9a3412;    /* Dark orange */
+            border: 1px solid #fed7aa;
+        }
+        .chart-container-card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem; 
+            margin-top: 2rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .calculator-card, .chart-container-card {
+                padding: 1.5rem;
+            }
+            .input-field, .calculate-button {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+    <div class="container mx-auto px-4 py-8 max-w-2xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-700">Retirement Pension Estimator</h1>
+            <p class="text-gray-500 mt-2">Estimate your potential OMERS pension and other retirement income, including early retirement considerations.</p>
+        </header>
+
+        <div id="messageBox" class="message-box hidden"></div>
+
+        <div class="calculator-card">
+            <form id="pensionForm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label for="creditedService" class="block text-sm input-label mb-1">Credited Service (Years)</label>
+                        <input type="number" id="creditedService" class="w-full input-field" placeholder="e.g., 28" step="0.1" required>
+                    </div>
+                    <div>
+                        <label for="retirementAge" class="block text-sm input-label mb-1">Age at Retirement</label>
+                        <input type="number" id="retirementAge" class="w-full input-field" placeholder="e.g., 60" required>
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label for="avgEarnings" class="block text-sm input-label mb-1">Average Annual Earnings (Best Five Years)</label>
+                    <input type="number" id="avgEarnings" class="w-full input-field" placeholder="e.g., 80000" step="100" required>
+                </div>
+
+                <h2 class="text-xl font-semibold text-gray-600 mb-4 mt-8 border-t pt-4">Optional: Government Pension Estimates</h2>
+                <p class="text-sm text-gray-500 mb-4">Enter your estimates or use defaults. These values will also be used for the 10-year projection chart.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label for="userCPP" class="block text-sm input-label mb-1">Your Estimated Monthly CPP</label>
+                        <input type="number" id="userCPP" class="w-full input-field" placeholder="e.g., 900" step="0.01">
+                    </div>
+                    <div>
+                        <label for="userOAS" class="block text-sm input-label mb-1">Your Estimated Monthly OAS</label>
+                        <input type="number" id="userOAS" class="w-full input-field" placeholder="e.g., 700" step="0.01">
+                    </div>
+                </div>
+
+                <button type="button" id="calculateButton" class="w-full calculate-button">
+                    Calculate Estimated Pension
+                </button>
+            </form>
+        </div>
+
+        <div id="resultsSection" class="calculator-card mt-8 hidden">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-6 text-center">Your Estimated Retirement Income</h2>
+            
+            <div id="reductionInfoMessage" class="message-box hidden mb-4"></div>
+
+            <div class="mb-6 p-4 results-card rounded-lg">
+                <h3 class="text-lg results-title mb-3">OMERS Pension Details (at Retirement Age: <span id="resultRetirementAge" class="font-bold"></span>)</h3>
+                <div class="space-y-2 text-sm">
+                    <p class="result-item">Annual Lifetime Pension: <strong id="annualLifetimePension"></strong></p>
+                    <p class="result-item">Monthly Lifetime Pension: <strong id="monthlyLifetimePension"></strong></p>
+                    <div id="bridgeBenefitSection">
+                        <p class="result-item">Annual Bridge Benefit (until age 65): <strong id="annualBridgeBenefit"></strong></p>
+                        <p class="result-item">Monthly Bridge Benefit (until age 65): <strong id="monthlyBridgeBenefit"></strong></p>
+                    </div>
+                    <p class="result-item mt-2 pt-2 border-t border-indigo-200">Total Annual OMERS Pension: <strong id="totalAnnualOmersPension" class="text-base"></strong></p>
+                    <p class="result-item">Total Monthly OMERS Pension: <strong id="totalMonthlyOmersPension" class="text-base"></strong></p>
+                </div>
+            </div>
+
+            <div class="mb-6 p-4 results-card rounded-lg">
+                <h3 class="text-lg results-title mb-3">Estimated Government Pensions (Monthly at Retirement)</h3>
+                <div class="space-y-2 text-sm">
+                    <p class="result-item">Canada Pension Plan (CPP): <strong id="estimatedCPP"></strong> <span id="cppNote" class="text-xs text-gray-500"></span></p>
+                    <p class="result-item">Old Age Security (OAS): <strong id="estimatedOAS"></strong> <span id="oasNote" class="text-xs text-gray-500"></span></p>
+                </div>
+            </div>
+
+            <div class="p-6 bg-green-50 border-l-4 border-green-500 rounded-lg">
+                 <h3 class="text-xl font-semibold text-green-700 mb-2">Total Estimated Monthly Income at Retirement</h3>
+                 <p class="text-2xl font-bold text-green-600" id="totalMonthlyIncome"></p>
+            </div>
+        </div>
+
+        <div id="chartContainerCard" class="chart-container-card mt-8 hidden">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 text-center">10-Year Total Income Projection (Annual, Stacked)</h2>
+            <canvas id="pensionProjectionChart"></canvas>
+        </div>
+
+        <div class="mt-8 p-4 text-sm text-gray-600 bg-gray-100 rounded-lg">
+            <h4 class="font-semibold text-gray-700 mb-2">Important Notes:</h4>
+            <ul class="list-disc list-inside space-y-1">
+                <li>This calculator provides an unofficial estimate for illustrative purposes only. It is not financial advice.</li>
+                <li>The OMERS pension calculation uses a factor of 2% per year of credited service for the lifetime pension.</li>
+                <li>The Bridge Benefit is estimated using a factor of 0.00675 (0.675%) per year of credited service (up to 35 years) and the 2025 Year's Maximum Pensionable Earnings (YMPE) of $69,700.</li>
+                <li>An early retirement reduction of 5% per year may apply if you retire with less than 30 years of credited service OR before age 65. The reduction is calculated on a number of years equal to the <strong>minimum</strong> of:
+                    <ul class="list-disc list-inside ml-4">
+                        <li>(a) The number of years your credited service is short of 30, and</li>
+                        <li>(b) The number of years your retirement age is short of 65.</li>
+                    </ul>
+                    If retiring at age 65 or older WITH 30 or more years of credited service, no such reduction applies.
+                </li>
+                <li>CPP and OAS amounts are estimates. Your actual CPP will depend on your contribution history. OAS is subject to residency requirements and potential income-based recovery tax.</li>
+                <li>For the projection chart: CPP is assumed to start at your retirement age (but not before age 60). OAS is assumed to start at age 65.</li>
+                <li>Consult with OMERS directly or a qualified financial advisor for precise pension information and retirement planning.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Constants for calculation
+        const YMPE_2025 = 69700; 
+        const DEFAULT_MONTHLY_CPP = 800; 
+        const DEFAULT_MONTHLY_OAS_MAX = 713.34; // Q2 2025 (Apr-Jun), ages 65-74.
+
+        // DOM Elements
+        const creditedServiceEl = document.getElementById('creditedService');
+        const retirementAgeEl = document.getElementById('retirementAge');
+        const avgEarningsEl = document.getElementById('avgEarnings');
+        const userCPPEl = document.getElementById('userCPP');
+        const userOASEl = document.getElementById('userOAS');
+        const calculateButton = document.getElementById('calculateButton');
+        const resultsSection = document.getElementById('resultsSection');
+        const messageBox = document.getElementById('messageBox');
+        const reductionInfoMessageEl = document.getElementById('reductionInfoMessage');
+        const chartContainerCardEl = document.getElementById('chartContainerCard');
+
+        // Result display elements
+        const resultRetirementAgeEl = document.getElementById('resultRetirementAge');
+        const annualLifetimePensionEl = document.getElementById('annualLifetimePension');
+        const monthlyLifetimePensionEl = document.getElementById('monthlyLifetimePension');
+        const bridgeBenefitSectionEl = document.getElementById('bridgeBenefitSection');
+        const annualBridgeBenefitEl = document.getElementById('annualBridgeBenefit');
+        const monthlyBridgeBenefitEl = document.getElementById('monthlyBridgeBenefit');
+        const totalAnnualOmersPensionEl = document.getElementById('totalAnnualOmersPension');
+        const totalMonthlyOmersPensionEl = document.getElementById('totalMonthlyOmersPension');
+        const estimatedCPPEl = document.getElementById('estimatedCPP');
+        const cppNoteEl = document.getElementById('cppNote');
+        const estimatedOASEl = document.getElementById('estimatedOAS');
+        const oasNoteEl = document.getElementById('oasNote');
+        const totalMonthlyIncomeEl = document.getElementById('totalMonthlyIncome');
+
+        let pensionProjectionChart = null; 
+
+        // Function to display messages (error or info)
+        function showMessage(text, type = 'error', targetElement = messageBox) {
+            targetElement.textContent = text;
+            targetElement.className = 'message-box'; // Reset classes
+            if (type === 'error') {
+                targetElement.classList.add('message-box-error');
+            } else { // 'info' or other types for general messages
+                targetElement.classList.add('message-box-info');
+            }
+            targetElement.classList.remove('hidden');
+        }
+
+        // Function to hide a message box
+        function hideMessage(targetElement = messageBox) {
+            targetElement.classList.add('hidden');
+            targetElement.textContent = ''; // Clear content
+        }
+        
+        // Function to format a number as currency
+        function formatCurrency(amount) {
+            return amount.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+        }
+
+        // Main calculation function
+        function calculatePension() {
+            hideMessage(); 
+            hideMessage(reductionInfoMessageEl); 
+            resultsSection.classList.add('hidden'); 
+            chartContainerCardEl.classList.add('hidden'); 
+
+            const creditedService = parseFloat(creditedServiceEl.value);
+            const retirementAge = parseInt(retirementAgeEl.value); 
+            const avgEarnings = parseFloat(avgEarningsEl.value);
+            const userCPP = parseFloat(userCPPEl.value) || null;
+            const userOAS = parseFloat(userOASEl.value) || null;
+
+            if (isNaN(creditedService) || creditedService < 0) {
+                showMessage('Please enter a valid number for Credited Service.'); return;
+            }
+            if (isNaN(retirementAge) || retirementAge < 18 || retirementAge > 100) { 
+                showMessage('Please enter a valid Retirement Age.'); return;
+            }
+            if (isNaN(avgEarnings) || avgEarnings < 0) {
+                showMessage('Please enter a valid number for Average Annual Earnings.'); return;
+            }
+            if (userCPP !== null && (isNaN(userCPP) || userCPP < 0)) {
+                showMessage('Please enter a valid number for Estimated Monthly CPP or leave it blank.'); return;
+            }
+            if (userOAS !== null && (isNaN(userOAS) || userOAS < 0)) {
+                showMessage('Please enter a valid number for Estimated Monthly OAS or leave it blank.'); return;
+            }
+
+            const rawAnnualLifetimePension = 0.02 * creditedService * avgEarnings;
+            let rawAnnualBridgeBenefit = 0;
+            if (retirementAge < 65) {
+                const bridgeBenefitServiceYears = Math.min(creditedService, 35); 
+                const earningsForBridgeCalc = Math.min(avgEarnings, YMPE_2025);
+                rawAnnualBridgeBenefit = 0.00675 * bridgeBenefitServiceYears * earningsForBridgeCalc;
+            }
+
+            // --- New Early Retirement Reduction Calculation ---
+            let earlyRetirementReductionFactor = 0;
+            let reductionYears = 0;
+            let reductionReason = "";
+
+            const serviceDeficit = Math.max(0, 30 - creditedService);
+            const ageDeficit = Math.max(0, 65 - retirementAge);
+
+            // A reduction applies if service is < 30 OR age is < 65
+            // But NOT if service >= 30 AND age >= 65 (i.e. normal retirement)
+            if (creditedService < 30 || retirementAge < 65) {
+                // If both are true, or only one is true, this block executes.
+                // If service >= 30 AND age >= 65, this block is skipped.
+                reductionYears = Math.min(serviceDeficit, ageDeficit);
+                if (reductionYears > 0) {
+                    earlyRetirementReductionFactor = reductionYears * 0.05;
+                    reductionReason = `This is based on ${reductionYears} year(s), calculated as the minimum of [${serviceDeficit} year(s) service short of 30] and [${ageDeficit} year(s) younger than age 65]. A reduction may apply if service is less than 30 years or retirement age is less than 65.`;
+                }
+            }
+            // Ensure reduction factor doesn't exceed 100%
+            earlyRetirementReductionFactor = Math.min(earlyRetirementReductionFactor, 1.0); 
+            
+            const reductionMultiplier = 1 - earlyRetirementReductionFactor;
+            const annualLifetimePension = rawAnnualLifetimePension * reductionMultiplier;
+            const annualBridgeBenefit = rawAnnualBridgeBenefit * reductionMultiplier; 
+            const monthlyLifetimePension = annualLifetimePension / 12;
+            const monthlyBridgeBenefit = annualBridgeBenefit / 12;
+            
+            const totalAnnualOmersPensionAtRetirement = annualLifetimePension + (retirementAge < 65 ? annualBridgeBenefit : 0);
+            const totalMonthlyOmersPensionAtRetirement = totalAnnualOmersPensionAtRetirement / 12;
+
+            let estimatedMonthlyCPPAtRetirement = 0;
+            let cppNoteText = "(Not eligible until age 60)";
+            if (retirementAge >= 60) {
+                estimatedMonthlyCPPAtRetirement = userCPP !== null ? userCPP : DEFAULT_MONTHLY_CPP;
+                cppNoteText = `(Assumed to start at retirement age ${retirementAge})`;
+            } else {
+                 cppNoteText = `(Not starting at retirement age ${retirementAge}. Assumed to start at age 60 for chart projection if applicable.)`;
+            }
+
+            let estimatedMonthlyOASAtRetirement = 0;
+            let oasNoteText = "(Not eligible until age 65)";
+            if (retirementAge >= 65) {
+                estimatedMonthlyOASAtRetirement = userOAS !== null ? userOAS : DEFAULT_MONTHLY_OAS_MAX;
+                 oasNoteText = `(Eligible at retirement. Default is max for age 65-74.)`;
+            }
+            
+            const totalMonthlyIncome = totalMonthlyOmersPensionAtRetirement + estimatedMonthlyCPPAtRetirement + estimatedMonthlyOASAtRetirement;
+
+            resultRetirementAgeEl.textContent = retirementAge;
+            annualLifetimePensionEl.textContent = formatCurrency(annualLifetimePension);
+            monthlyLifetimePensionEl.textContent = formatCurrency(monthlyLifetimePension);
+
+            if (earlyRetirementReductionFactor > 0 && reductionReason) {
+                const reductionPercentage = (earlyRetirementReductionFactor * 100).toFixed(1);
+                showMessage(`An early retirement reduction of ${reductionPercentage}% has been applied to your OMERS pension. ${reductionReason}`, 'info', reductionInfoMessageEl);
+            } else {
+                hideMessage(reductionInfoMessageEl);
+            }
+
+            if (retirementAge < 65 && annualBridgeBenefit > 0) {
+                annualBridgeBenefitEl.textContent = formatCurrency(annualBridgeBenefit);
+                monthlyBridgeBenefitEl.textContent = formatCurrency(monthlyBridgeBenefit);
+                bridgeBenefitSectionEl.classList.remove('hidden');
+            } else {
+                bridgeBenefitSectionEl.classList.add('hidden');
+            }
+
+            totalAnnualOmersPensionEl.textContent = formatCurrency(totalAnnualOmersPensionAtRetirement);
+            totalMonthlyOmersPensionEl.textContent = formatCurrency(totalMonthlyOmersPensionAtRetirement);
+            
+            estimatedCPPEl.textContent = formatCurrency(estimatedMonthlyCPPAtRetirement);
+            cppNoteEl.textContent = cppNoteText;
+            estimatedOASEl.textContent = formatCurrency(estimatedMonthlyOASAtRetirement);
+            oasNoteEl.textContent = oasNoteText;
+            totalMonthlyIncomeEl.textContent = formatCurrency(totalMonthlyIncome);
+
+            resultsSection.classList.remove('hidden');
+            
+            const annualCPPForChart = (userCPP !== null ? userCPP : DEFAULT_MONTHLY_CPP) * 12;
+            const annualOASForChart = (userOAS !== null ? userOAS : DEFAULT_MONTHLY_OAS_MAX) * 12;
+
+            updatePensionProjectionChart(retirementAge, annualLifetimePension, annualBridgeBenefit, annualCPPForChart, annualOASForChart);
+            chartContainerCardEl.classList.remove('hidden');
+
+            if (window.innerWidth < 768) {
+                resultsSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+        
+        function updatePensionProjectionChart(initialRetirementAge, reducedAnnualLifetime, reducedAnnualBridge, annualCPPValue, annualOASValue) {
+            const chartLabels = [];
+            const omersData = [];
+            const cppData = [];
+            const oasData = [];
+
+            for (let i = 0; i < 10; i++) {
+                const currentAgeInProjection = initialRetirementAge + i;
+                chartLabels.push(`Age ${currentAgeInProjection}`);
+                
+                let omersPensionForYear = reducedAnnualLifetime;
+                if (currentAgeInProjection < 65) { 
+                    omersPensionForYear += reducedAnnualBridge; 
+                }
+                omersData.push(omersPensionForYear);
+
+                let cppForYear = 0;
+                if (currentAgeInProjection >= Math.max(60, initialRetirementAge)) {
+                    cppForYear = annualCPPValue;
+                }
+                cppData.push(cppForYear);
+
+                let oasForYear = 0;
+                if (currentAgeInProjection >= 65) {
+                    oasForYear = annualOASValue;
+                }
+                oasData.push(oasForYear);
+            }
+
+            const ctx = document.getElementById('pensionProjectionChart').getContext('2d');
+            if (pensionProjectionChart) {
+                pensionProjectionChart.destroy(); 
+            }
+            pensionProjectionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        {
+                            label: 'OMERS Annual Pension',
+                            data: omersData,
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)', 
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        },
+                        {
+                            label: 'CPP Annual Pension',
+                            data: cppData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.7)', 
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        },
+                        {
+                            label: 'OAS Annual Pension',
+                            data: oasData,
+                            backgroundColor: 'rgba(249, 115, 22, 0.7)', 
+                            borderColor: 'rgba(249, 115, 22, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true, 
+                    scales: {
+                        x: {
+                             stacked: true, 
+                             title: {
+                                display: true,
+                                text: 'Age'
+                            }
+                        },
+                        y: {
+                            stacked: true, 
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Estimated Annual Income'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += formatCurrency(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    }
+                }
+            });
+        }
+
+        calculateButton.addEventListener('click', calculatePension);
+        document.getElementById('pensionForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            calculatePension();
+        });
+    </script>
+</body>
+</html>
